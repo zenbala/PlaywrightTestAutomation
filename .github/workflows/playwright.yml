@@ -1,0 +1,104 @@
+# =====================================================================
+# GITHUB ACTIONS CONTINUOUS INTEGRATION (CI) WORKFLOW CONFIGURATION
+# =====================================================================
+name: Playwright Enterprise Test Suite
+
+# Define the automated execution triggers for the deployment pipeline
+on:
+  push:
+    branches: [ main, master ]      # Triggers when code is directly merged into primary branches
+  pull_request:
+    branches: [ main, master ]      # Triggers during code review cycles targeting primary branches
+  schedule:
+    - cron: '0 0 * * *'             # Automated cron routine: Runs daily at midnight UTC for regression tracking
+
+# Establish explicit security permissions required by GitHub Actions tokens during runtime
+permissions:
+  contents: write                   # Necessary to write test artifacts and history back to the repo
+  pages: write                      # Required for interacting with the hosting canvas of GitHub Pages
+  id-token: write                   # Required for cryptographic open-id connect authentication sequences
+
+jobs:
+  test:
+    timeout-minutes: 30             # Safety guardrail to prevent hanging async threads from burning action runners
+    runs-on: ubuntu-latest          # Employs a clean, enterprise-grade Linux virtual environment instance
+
+    steps:
+    # -----------------------------------------------------------------
+    # STEP 1: INFRASTRUCTURE PROVISIONING & ENVIRONMENT SETUP
+    # -----------------------------------------------------------------
+    - name: Checkout Code Repository
+      uses: actions/checkout@v4     # Clones your codebase onto the isolated execution runner instance
+
+    - name: Set up Python Runtime
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'      # Pins the execution loop to a stable, optimal Python release
+        cache: 'pip'                # Caches pip dependencies globally to drastically accelerate downstream runner cycles
+
+    - name: Install System and Framework Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+    - name: Install Playwright Browser Engines & OS Dependencies
+      # Restricts browser setup strictly to Chromium to match your framework settings and save runner processing time
+      run: playwright install --with-deps chromium
+
+    # -----------------------------------------------------------------
+    # STEP 2: HISTORICAL TEST DATA SYNCHRONIZATION
+    # -----------------------------------------------------------------
+    - name: Fetch Past Allure History (For Trend Metrics)
+      uses: actions/checkout@v4
+      if: always()                  # Runs regardless of up-stream outcomes to preserve reporting continuity
+      continue-on-error: true       # Prevents the pipeline from crashing on the absolute first baseline framework execution
+      with:
+        ref: gh-pages               # Tracks the dedicated static hosting branch
+        path: gh-pages              # Pulls history into a localized context directory
+
+    # -----------------------------------------------------------------
+    # STEP 3: CORE AUTOMATED FRAMEWORK EXECUTION
+    # -----------------------------------------------------------------
+    - name: Execute Automated Test Suite (Parallel Execution)
+      # Securely maps encrypted repository vault secrets over to system environmental variables
+      env:
+        BASE_URL: ${{ secrets.BASE_URL }}
+        ENV_USER: ${{ secrets.ENV_USER }}
+        ENV_PASSWORD: ${{ secrets.ENV_PASSWORD }}
+        USERNAME: ${{ secrets.ENV_USER }}        # Supports compatibility for legacy globalAuth parameters
+        PASSWORD: ${{ secrets.ENV_PASSWORD }}    # Supports compatibility for legacy globalAuth parameters
+      run: |
+        pytest                     # Triggers your pytest.ini parameters natively (-n auto, multi-threading, etc.)
+
+    # -----------------------------------------------------------------
+    # STEP 4: DIAGNOSTIC COMPILATION & LIVE REPORT DEPLOYMENT
+    # -----------------------------------------------------------------
+    - name: Generate Visual Allure Report
+      uses: simple-elf/allure-report-action@master
+      if: always()                  # Enforces generation even if underlying functional validation test assertions fail
+      id: allure-report
+      with:
+        allure_results: allure-results
+        gh_pages: gh-pages
+        allure_report: allure-report
+        allure_history: allure-history
+
+    - name: Deploy Allure Test Dashboard to GitHub Pages
+      if: always()                  # Publishes the current build's visual outcome to the active tracking dashboard web link
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }} # Uses GitHub's automated generation runtime key token
+        publish_dir: allure-history
+        publish_branch: gh-pages     # Forces artifact code compilation out to your active reporting branch
+
+    # -----------------------------------------------------------------
+    # STEP 5: TROUBLESHOOTING & FAILURE TRIAGE MANAGEMENT
+    # -----------------------------------------------------------------
+    - name: Archive System Diagnostic Artifacts (Screenshots & Traces)
+      if: failure()                 # Condition Isolation: ONLY triggers heavy file operations if a test case breaks
+      uses: actions/artifacts-action@v1
+      with:
+        name: playwright-failure-diagnostics
+        path: |                     # Gathers critical runtime assets to isolate failures locally within 10 seconds
+          allure-results/*.png      # Captures full-scale screenshot stamps from error moments
+          allure-results/*.zip      # Retains Playwright's highly interactive chronological trace timelines

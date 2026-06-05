@@ -1,0 +1,50 @@
+# ==========================================
+# Framework-Specific States (Crucial)
+# ==========================================
+# Ignore your local global authentication cookies/localStorage payload file
+data/session_state.json
+
+# Ignore local environment configuration secrets containing your application passwords
+.env
+
+# ==========================================
+# Python Runtime & Caching
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.python-version
+
+# ==========================================
+# Virtual Environments
+# ==========================================
+venv/
+.venv/
+env/
+ENV/
+
+# ==========================================
+# Playwright & Browser Binaries
+# ==========================================
+# Prevents heavy automated browser engines from being tracked in source code
+.playwright/
+node_modules/
+
+# ==========================================
+# Framework Reports & Logs
+# ==========================================
+# Ignore local test reports (GitHub Actions pipeline generates its own)
+allure-results/
+allure-report/
+gh-pages/
+htmlcov/
+*.log
+
+# ==========================================
+# IDEs and Code Editors
+# ==========================================
+.vscode/
+.idea/          # Ignores PyCharm / IntelliJ settings folders as well
+*.swp
+*.swo
