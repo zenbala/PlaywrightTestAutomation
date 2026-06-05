@@ -1,0 +1,7 @@
+{
+  "invalid_user": {
+    "username": "wrong_user",
+    "password": "bad_password",
+    "expected_error": "Invalid credentials."
+  }
+}
